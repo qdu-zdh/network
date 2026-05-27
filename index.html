@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>网络动力学终极模拟器 (40大模型版)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    body { background-color: #020617; color: #f1f5f9; margin: 0; overflow: hidden; }
+    .custom-scrollbar::-webkit-scrollbar { width: 5px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #334155; border-radius: 10px; }
+    .prose h3 { margin-top: 0; color: #f8fafc; font-size: 1.25rem; font-weight: 600; border-bottom: 1px solid #334155; padding-bottom: 0.5rem; margin-bottom: 1rem; }
+    .prose h4 { color: #cbd5e1; font-size: 1.1rem; font-weight: 500; margin-bottom: 0.5rem; margin-top: 1rem;}
+    .prose p { margin-bottom: 1rem; line-height: 1.6; font-size: 0.95rem; }
+    .prose ul { list-style-type: disc; padding-left: 1.5rem; margin-bottom: 1rem; font-size: 0.95rem; }
+    .prose li { margin-bottom: 0.25rem; }
+    .prose b, .prose strong { color: #e2e8f0; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useCallback } = React;
+
+    // ==========================================
+    // 0. 内联图标组件
+    // ==========================================
+    const Play = ({size=16}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>;
+    const Pause = ({size=16}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>;
+    const RotateCcw = ({size=16}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>;
+    const Info = ({size=16}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>;
+    const Activity = ({size=16}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>;
+    const Users = ({size=16}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>;
+    const ChevronRight = ({size=16}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>;
+    const Settings = ({size=16}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>;
+    const X = ({size=16}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>;
+
+    // 常用参数模板
+    const pBeta = { id: 'beta', name: '感染率 (β)', min: 0, max: 1, step: 0.01, default: 0.25 };
+    const pGamma = { id: 'gamma', name: '恢复率 (γ)', min: 0, max: 0.1, step: 0.001, default: 0.01 };
+    const pSigma = { id: 'sigma', name: '潜伏转化率 (σ)', min: 0, max: 0.2, step: 0.01, default: 0.05 };
+    const pMu = { id: 'mu_d', name: '致死率 (μ)', min: 0, max: 0.1, step: 0.001, default: 0.005 };
+    const pAlpha = { id: 'alpha', name: '免疫丧失率 (α)', min: 0, max: 0.1, step: 0.001, default: 0.005 };
+    const pRadius = { id: 'radius', name: '感知半径 (R)', min: 10, max: 100, step: 1, default: 30 };
+    const pEps = { id: 'epsilon', name: '信任阈值 (ε)', min: 0, max: 0.5, step: 0.01, default: 0.2 };
+    const pMuOp = { id: 'mu_op', name: '收敛步长 (μ)', min: 0, max: 1, step: 0.05, default: 0.3 };
+
+    // ==========================================
+    // 1. 模型大数据库 (40个模型)
+    // ==========================================
+    const MODELS = {
+      epidemic: [
+        { id: 'sir', name: '1. SIR 基础模型', desc: '经典仓室模型 (易感-感染-恢复)。', params: [pBeta, pGamma], explanation: `<h3>SIR 基础动力学</h3><p>将人群分为 S (易感), I (感染), R (恢复并获得终身免疫)。</p><p>方程：dS/dt = -βSI/N, dI/dt = βSI/N - γI, dR/dt = γI</p>` },
+        { id: 'seir', name: '2. SEIR 潜伏期模型', desc: '包含暴露/潜伏期(E)的经典模型。', params: [pBeta, pSigma, pGamma], explanation: `<h3>SEIR 模型</h3><p>增加 E (Exposed) 状态。感染后需经过潜伏期(1/σ)才具有传染性。</p><p>这是描述大多数人类传染病(如流感、新冠初期)的最标准框架。</p>` },
+        { id: 'sis', name: '3. SIS 无免疫模型', desc: '治愈后重新变成易感者(如感冒)。', params: [pBeta, pGamma], explanation: `<h3>SIS 模型</h3><p>疾病不会赋予免疫力，恢复后立刻回到 S 态 (S -> I -> S)。</p><p>系统最终不会消灭疾病，而是进入一种地方性流行(Endemic)的动态平衡状态。</p>` },
+        { id: 'sirs', name: '4. SIRS 暂时免疫模型', desc: '恢复一段时间后丧失免疫力。', params: [pBeta, pGamma, pAlpha], explanation: `<h3>SIRS 模型</h3><p>R态个体以速率 α 丧失抗体，重新退化为 S 态。该机制会导致疫情在宏观上呈现周期性的波峰和波谷震荡。</p>` },
+        { id: 'seirs', name: '5. SEIRS 完整周期模型', desc: '潜伏期与免疫衰退的结合体。', params: [pBeta, pSigma, pGamma, pAlpha], explanation: `<h3>SEIRS 模型</h3><p>集齐了潜伏延迟和抗体衰退，是模拟具有季节性爆发特征病毒(如变异流感)的理想基座模型。</p>` },
+        { id: 'sid', name: '6. SID 致死模型', desc: '没有恢复，只有感染或死亡。', params: [pBeta, pMu], explanation: `<h3>SID 致死模型</h3><p>感染者(I)的唯一去向是以速率 μ 死亡(D)。死亡后个体呈现为黑色固定节点，并被移出活跃社交网络。</p>` },
+        { id: 'seird', name: '7. SEIRD 潜伏致死模型', desc: '高危烈性传染病架构。', params: [pBeta, pSigma, pGamma, pMu], explanation: `<h3>SEIRD 模型</h3><p>感染者(I)面临分岔口：要么康复(R)获得免疫，要么死亡(D)。是宏观流行病学最常用的评估致死类病毒的骨干模型。</p>` },
+        { id: 'siqr', name: '8. SIQR 隔离模型', desc: '引入公共卫生干预(Q隔离)。', params: [pBeta, {id:'delta', name:'隔离发现率', min:0, max:0.1, step:0.001, default:0.02}, pGamma], explanation: `<h3>SIQR 隔离模型</h3><p>感染者(I)以速率 δ 被检测出并强制进入隔离态(Q)。处于Q状态的个体被限制移动，切断接触链条，直到康复。</p>` },
+        { id: 'sair', name: '9. SAIR 无症状感染模型', desc: '隐蔽传播者防线穿透。', params: [pBeta, {id:'beta_A', name:'无症状感染率', min:0, max:1, step:0.01, default:0.1}, {id:'p', name:'无症状比例', min:0, max:1, step:0.05, default:0.4}, pGamma], explanation: `<h3>SAIR 模型</h3><p>S被传染后，有概率 p 变为无症状者(A)，概率 1-p 变为显性感染者(I)。A在人群中正常移动，具有较低传染性，是疫情防控核心难点。</p>` },
+        { id: 'si', name: '10. SI 丧尸/不治之症模型', desc: '一旦感染永远携带并传播。', params: [pBeta], explanation: `<h3>SI 模型</h3><p>没有治愈机制。个体一旦被感染将永远在网络中游荡并传播病毒。系统最终的必然归宿是全员感染(100% 患病)。</p>` },
+        { id: 'sivr', name: '11. SIVR 疫苗接种模型', desc: '预先接种疫苗建立人工免疫。', params: [pBeta, pGamma, {id:'v_rate', name:'自发接种率', min:0, max:0.05, step:0.001, default:0.002}], explanation: `<h3>SIVR 模型</h3><p>易感者(S)会以一定速率接种疫苗变为(V)，获得永久免疫，从而在空间中构筑起“群体免疫屏障”，阻断病毒传播路径。</p>` },
+        { id: 'msir', name: '12. MSIR 母婴免疫模型', desc: '携带母体抗体的初生儿。', params: [pBeta, pGamma, {id:'m_decay', name:'母体抗体消退率', min:0, max:0.05, step:0.001, default:0.005}], explanation: `<h3>MSIR 模型</h3><p>模拟新生儿群体。初始有一部分个体处于 M (Maternal immunity) 状态。M 态不被感染，但抗体会随时间自然消退变为 S，随后参与 SIR 循环。</p>` },
+        { id: 'sei', name: '13. SEI 无恢复潜伏模型', desc: '潜伏期极长且无法治愈。', params: [pBeta, pSigma], explanation: `<h3>SEI 模型</h3><p>常用于模拟某些特定潜伏期极长、发病后无法治愈且迅速丧失行动能力的特殊疾病或网络计算机病毒机制。</p>` },
+        { id: 'sia', name: '14. SIA 意识觉醒模型 (Awareness)', desc: '个体得知疫情后主动降低接触。', params: [pBeta, pGamma, {id:'w_rate', name:'警觉率', min:0, max:0.1, step:0.001, default:0.01}], explanation: `<h3>SIA 意识觉醒模型</h3><p>易感者(S)会接收社会疫情信息变为警觉状态(W)。W态个体由于采取防护措施(如戴口罩)，被感染概率大幅降低。</p>` },
+        { id: 'sihr', name: '15. SIHR 医院收治模型', desc: '模拟医疗系统承载力。', params: [pBeta, {id:'h_rate', name:'收治住院率', min:0, max:0.1, step:0.001, default:0.01}, pGamma], explanation: `<h3>SIHR 模型</h3><p>感染者(I)会进入医院(H)。H态个体停止移动，且受到严格管控传染率极低。这用于评估疫情峰值是否击穿医疗床位容量。</p>` },
+        { id: 'seiqh', name: '16. SEIQH 现代防疫全息模型', desc: '包含追踪、隔离与收治的综合体。', params: [pBeta, pSigma, {id:'q_rate', name:'密接追踪率', min:0, max:0.1, step:0.001, default:0.02}, {id:'h_rate', name:'重症转院率', min:0, max:0.1, step:0.001, default:0.01}, pGamma], explanation: `<h3>SEIQH 现代防疫模型</h3><p>S -> E -> I -> Q(隔离) -> H(住院) -> R。这是新冠期间被广泛用于推演宏观政策的核心复杂动力学拓扑之一。</p>` },
+        { id: 'sir_mask', name: '17. SIR-M 空间局部防线模型', desc: '基于密度的自发口罩行为。', params: [pBeta, pGamma, {id:'mask_thresh', name:'戴口罩恐慌阈值', min:1, max:10, step:1, default:3}], explanation: `<h3>SIR-M 局部防线模型</h3><p>个体具有空间感知能力。当某个 S 个体发现自己周围(感知半径内)的感染者数量超过“恐慌阈值”时，会自动戴上口罩(变色减速)，抵御病毒。</p>` },
+        { id: 'sirt', name: '18. SIRT 靶向治疗模型', desc: '引入特效药，加速康复进程。', params: [pBeta, pGamma, {id:'t_rate', name:'获得治疗率', min:0, max:0.1, step:0.001, default:0.02}, {id:'t_gamma', name:'治疗后恢复率', min:0.01, max:0.5, step:0.01, default:0.1}], explanation: `<h3>SIRT 治疗模型</h3><p>部分感染者(I)能获得特效药进入治疗态(T)。T 态由于药物干预，其康复至 R 态的速率远大于自然恢复率。</p>` },
+        { id: 'seirq', name: '19. SEIRQ 暴露后前置隔离', desc: '精准流调：在发病前阻断。', params: [pBeta, pSigma, pGamma, {id:'q_rate_E', name:'潜伏期追踪率', min:0, max:0.1, step:0.001, default:0.03}], explanation: `<h3>SEIRQ 前置隔离模型</h3><p>通过流调系统，个体在 E (潜伏期) 状态时就被发现并拉走隔离(Q)，从而在他们具备传染性之前斩断传播链，是清零策略的底层数学逻辑。</p>` },
+        { id: 'siri', name: '20. SIRI 突破性重感染模型', desc: '抗体变异逃逸，恢复者再感染。', params: [pBeta, pGamma, {id:'re_beta', name:'重感染系数(相比S)', min:0, max:1, step:0.05, default:0.3}], explanation: `<h3>SIRI 重感染模型</h3><p>不同于SIRS的抗体随时间消退，SIRI模型中，恢复者(R)如果遭遇高浓度病毒(接触I)，由于病毒变异等原因，仍有一定概率(通常低于S)被再次突破防线变为 I。</p>` }
+      ],
+      opinion: [
+        { id: 'hk', name: '1. HK 有界信任连续模型', desc: '经典的群体妥协与信息茧房。', params: [pEps, pMuOp], explanation: `<h3>Hegselmann-Krause 模型</h3><p>个体观点连续(0~1)。个体只吸收观点差距在 ε 以内的邻居的观点，取平均值。ε大时全球化共识，ε小时形成多个两极分化的独立阵营。</p>` },
+        { id: 'dw', name: '2. DW 结对对话模型', desc: '两两成对交流的妥协模型。', params: [pEps, pMuOp], explanation: `<h3>Deffuant-Weisbuch 模型</h3><p>不同于HK的群体会议制，DW在每步随机让两个邻居“私聊”。如果观点差 < ε，双方互相靠拢 μ 步长。该模型收敛速度和动态簇的形成极具物理美感。</p>` },
+        { id: 'voter', name: '3. Voter 基础离散投票', desc: '无条件模仿邻居的二元模型。', params: [], explanation: `<h3>Voter 极简模型</h3><p>观点非此即彼(0或1)。个体无条件、随机地拷贝周围某一个邻居的观点。在二维空间中，会自发形成具有类似液体表面张力的巨大纯色宏观斑块。</p>` },
+        { id: 'majority', name: '4. Majority 多数决从众模型', desc: '随大流，倒向人多的一方。', params: [pRadius], explanation: `<h3>多数决模型</h3><p>个体环顾四周，统计阵营人数，随后无脑倒向占据多数优势的一方。这会导致系统极度快速地发生相变，瞬间凝固成坚硬的纯色区块。</p>` },
+        { id: 'sznajd', name: '5. Sznajd 统一战线模型', desc: '“团结就是力量”的洗脑模型。', params: [pRadius], explanation: `<h3>Sznajd 模型</h3><p>基于 Outflow 动力学。如果两个相邻个体的观点一致，他们就结成了“统一战线”，强制将周围所有人同化为自己的观点。反之则无说服力。</p>` },
+        { id: 'ising', name: '6. Ising 物理自旋网络模型', desc: '引入社会温度的统计力学模型。', params: [{id:'temperature', name:'社会温度', min:0.1, max:5, step:0.1, default:1.5}], explanation: `<h3>Ising Glauber 动力学</h3><p>观点为 +1/-1。个体倾向于和周围保持一致以降低“能量”。概率受“温度”T控制：T低时极度从众；T高时社会动荡，完全随机盲动。</p>` },
+        { id: 'zealot', name: '7. Zealot 极端分子渗透模型', desc: '少数派如何颠覆大多数？', params: [{id:'zealotRatio', name:'狂热分子比例', min:0, max:0.2, step:0.01, default:0.05}], explanation: `<h3>Zealot 顽固分子</h3><p>在基础模仿网络中混入一群永不改变观点的红方极端狂热分子(Zealot)。你可以观察到这区区 5% 的绝对坚持者，是如何通过时间的推移逐渐同化整个摇摆群体的。</p>` },
+        { id: 'fj', name: '8. FJ 固有偏见拉扯模型', desc: '妥协与自我坚持的平衡。', params: [{id:'alpha', name:'对他人受影响度', min:0, max:1, step:0.05, default:0.5}], explanation: `<h3>Friedkin-Johnsen 模型</h3><p>个体除了吸收周围人的意见，心底还永远保留了一份初始的“固有偏见”。公式融合了社会网络均值和初始设定。系统永远无法绝对统一，维持着丰富的动态多样性。</p>` },
+        { id: 'naming', name: '9. Naming Game 命名博弈', desc: '语言和词汇如何自发统一。', params: [pRadius], explanation: `<h3>Naming Game</h3><p>每个人有本词典。A随机说个词，如果B听懂了(词典里有)，两人都清空词典只留这个词。听不懂，B就把词加入词典。最终无数纷杂的语言会突变为全网统一的一门语言。</p>` },
+        { id: 'axelrod', name: '10. Axelrod 多维文化融合', desc: '相似吸引导致文化同质或隔离。', params: [pRadius], explanation: `<h3>Axelrod 文化模型</h3><p>每个人的观点是一个多维向量(如RGB)。规则：相似度越高越愿意交流。一旦交流，就把不一样的地方同步。这解释了为什么世界既有大一统的文化圈，又存在不可弥合的文化断层。</p>` },
+        { id: 'noisy_voter', name: '11. Noisy Voter 噪音投票模型', desc: '带有自发背叛机制的Voter。', params: [{id:'noise', name:'自发转变概率', min:0, max:0.2, step:0.005, default:0.02}], explanation: `<h3>Noisy Voter (Kirman)</h3><p>即便周围人都选A，个体也有微小概率凭借自由意志(Noise)突然转投B。这打破了纯Voter模型的死锁，使得系统永远处于动态沸腾状态。</p>` },
+        { id: 'inertia_majority', name: '12. Inertia 多数决(带惯性)', desc: '改变观点需要压倒性多数。', params: [pRadius, {id:'threshold', name:'动摇阈值(%)', min:0.5, max:1, step:0.05, default:0.65}], explanation: `<h3>带惯性的多数决</h3><p>个体存在惰性。周围人数仅仅“多一点”不足以说服他，必须某一方的压倒性比例超过设定的阈值(如65%)，他才会转变。这导致了社会观点的巨大粘性。</p>` },
+        { id: 'contrarian', name: '13. Galam 逆反者模型', desc: '社会中的杠精与逆行者。', params: [pRadius, {id:'contra', name:'逆反者比例', min:0, max:0.5, step:0.01, default:0.1}], explanation: `<h3>Contrarian 逆反模型</h3><p>网络中存在一定比例的逆反者。他们不随大流，而是环顾四周后，故意选择与多数派“相反”的观点。他们的存在极大阻碍了社会共识的形成。</p>` },
+        { id: 'coda', name: '14. CODA 表里不一模型', desc: '内在连续信念 vs 外在离散表达。', params: [pRadius, {id:'alpha', name:'信念更新率', min:0.01, max:0.5, step:0.01, default:0.1}], explanation: `<h3>CODA 贝叶斯模型</h3><p>个体心里有个连续的概率信念 p(0~1)，但对外只表达离散的0或1(如投票只能选一个)。个体根据看到的外在动作更新内在 p。揭示了沉默的螺旋与突发性社会翻转。</p>` },
+        { id: 'altafini', name: '15. Altafini 负边极化模型', desc: '敌人的朋友是敌人(存在敌对关系)。', params: [pEps, pMuOp], explanation: `<h3>Altafini 对抗网络</h3><p>引入了社会学中的结构平衡理论。系统为每个人分配了假想的“宿敌”。个体向朋友靠拢，但向宿敌的观点产生“反向排斥”。导致系统无可避免地分裂为极化对抗的两极。</p>` },
+        { id: 'repulsive_hk', name: '16. R-HK 观点排斥模型', desc: '三观不合导致越走越远。', params: [pEps, pMuOp, {id:'rep_thresh', name:'排斥阈值', min:0.5, max:1, step:0.05, default:0.7}], explanation: `<h3>排斥性 HK 模型</h3><p>距离近( < ε )则吸收；如果距离过大( > 阈值 )，双方不仅不交流，反而产生厌恶感，互相推远彼此的观点，直接模拟了当代互联网的极化与撕裂。</p>` },
+        { id: 'stubborn_dw', name: '17. Stubborn DW 固执拉扯', desc: '两极水军争夺中间派。', params: [pEps, pMuOp], explanation: `<h3>包含两极水军的 DW</h3><p>在连续对话模型中，死死钉住了一批观点绝对为0和绝对为1的“固执水军”。观察他们在两端不断拉扯、撕裂原本想融合的中间派。</p>` },
+        { id: 'echo', name: '18. Echo Chamber 信息茧房', desc: '非线性加权：只听想听的话。', params: [pRadius, {id:'bias', name:'非线性偏好指数', min:1, max:5, step:0.5, default:2}], explanation: `<h3>信息茧房网络</h3><p>个体在平均邻居观点时不再是等权重的。观点越接近的邻居，其权重呈指数级放大；观点相左的邻居被直接过滤(降维)。完美再现了算法推荐时代的认知隔离。</p>` },
+        { id: 'truth', name: '19. Epistemic 认知寻真模型', desc: '客观真理广播 vs 社交噪音。', params: [pEps, pMuOp, {id:'truth_pull', name:'真理牵引力', min:0, max:0.1, step:0.005, default:0.02}], explanation: `<h3>寻真网络</h3><p>系统假定存在一个绝对真理(设定为暗绿色标度0.8)。个体除了互相受社交网络影响(可能被带偏)，每步还有微小概率受到“真理”的引力。看理性之光能否最终照耀全网。</p>` },
+        { id: 'bass', name: '20. Bass Diffusion 巴斯扩散', desc: '创新产品与谣言的单向采纳。', params: [pRadius, {id:'p_innov', name:'自发创新率(p)', min:0, max:0.05, step:0.001, default:0.005}, {id:'q_imit', name:'社会模仿率(q)', min:0, max:0.5, step:0.01, default:0.1}], explanation: `<h3>Bass 扩散模型</h3><p>营销学与社会学经典。0(未采纳)单向流向1(采纳)。受到个人自发接触广告(p)和身旁已被安利的朋友(q)的双重驱动。呈现经典的 S 型增长曲线。</p>` }
+      ]
+    };
+
+    const CATEGORIES = [
+      { id: 'epidemic', name: '传染病动力学 (20种)', icon: Activity },
+      { id: 'opinion', name: '观点动力学 (20种)', icon: Users }
+    ];
+
+    // ==========================================
+    // 2. 核心状态机与物理渲染颜色映射
+    // ==========================================
+    const COLORS = {
+      S: '#3b82f6', E: '#eab308', I: '#ef4444', R: '#22c55e', 
+      D: '#020617', Q: '#f97316', A: '#ec4899', M: '#a855f7',
+      V: '#06b6d4', W: '#38bdf8', H: '#991b1b', T: '#d97706',
+      Op0: '#3b82f6', Op1: '#ef4444', Zealot: '#7f1d1d', 
+      Contra: '#facc15', Truth: '#4ade80', Gray: '#64748b'
+    };
+
+    class SimulatorEngine {
+      constructor(category, modelId, params, width, height) {
+        this.category = category;
+        this.modelId = modelId;
+        this.params = params;
+        this.width = width;
+        this.height = height;
+        this.numAgents = 600;
+        this.agents = [];
+        this.tickCount = 0;
+        this.history = [];
+        this.initAgents();
+      }
+
+      initAgents() {
+        this.agents = [];
+        for (let i = 0; i < this.numAgents; i++) {
+          let a = {
+            id: i, x: Math.random() * this.width, y: Math.random() * this.height,
+            vx: (Math.random() - 0.5) * 1.5, vy: (Math.random() - 0.5) * 1.5,
+          };
+
+          if (this.category === 'epidemic') {
+            a.state = 'S';
+            if (this.modelId === 'msir') a.state = Math.random() < 0.3 ? 'M' : 'S';
+            
+            // 初始投放少量感染源
+            if (Math.random() < 0.02) {
+               if (this.modelId === 'sair') a.state = Math.random() < (this.params.p||0.4) ? 'A' : 'I';
+               else a.state = 'I';
+            }
+          } 
+          else if (this.category === 'opinion') {
+            if (['voter', 'majority', 'sznajd', 'ising', 'noisy_voter', 'inertia_majority', 'contrarian', 'stubborn_dw'].includes(this.modelId)) {
+              a.opinion = Math.random() < 0.5 ? 0 : 1;
+              if (this.modelId === 'ising') a.opinion = a.opinion === 0 ? -1 : 1;
+              if (this.modelId === 'contrarian') a.isContra = Math.random() < this.params.contra;
+              if (this.modelId === 'stubborn_dw') {
+                 if(Math.random()<0.05) a.isStubborn = 0;
+                 else if(Math.random()<0.05) a.isStubborn = 1;
+              }
+            }
+            else if (['hk', 'dw', 'fj', 'altafini', 'repulsive_hk', 'echo', 'truth'].includes(this.modelId)) {
+              a.opinion = Math.random();
+              if (this.modelId === 'fj') a.initialOp = a.opinion;
+              if (this.modelId === 'altafini') a.enemyId = Math.floor(Math.random() * this.numAgents);
+            }
+            else if (this.modelId === 'zealot') {
+              a.isZealot = Math.random() < this.params.zealotRatio;
+              a.opinion = a.isZealot ? 1 : (Math.random() < 0.5 ? 0 : 1);
+            }
+            else if (this.modelId === 'naming') a.vocab = [Math.floor(Math.random() * 6)];
+            else if (this.modelId === 'axelrod') a.traits = [Math.random()<0.5?0:1, Math.random()<0.5?0:1, Math.random()<0.5?0:1];
+            else if (this.modelId === 'coda') { a.hidden_p = Math.random(); a.opinion = a.hidden_p > 0.5 ? 1 : 0; }
+            else if (this.modelId === 'bass') a.opinion = 0; // 全0开始
+          }
+          this.agents.push(a);
+        }
+      }
+
+      dist(a, b) { return Math.sqrt((a.x - b.x)**2 + (a.y - b.y)**2); }
+
+      step() {
+        this.tickCount++;
+        const nextAgents = JSON.parse(JSON.stringify(this.agents));
+        let stats = {};
+
+        // === 1. 物理运动阶段 ===
+        for (let i = 0; i < this.numAgents; i++) {
+          let a = nextAgents[i];
+          let speedMult = 1;
+          
+          // 状态定身逻辑
+          if (a.state === 'D' || a.state === 'Q' || a.state === 'H') continue;
+          
+          // SIR-Mask 特殊逻辑：周围感染者多，移动减速戴口罩
+          if (this.modelId === 'sir_mask' && a.state === 'S') {
+            let infNear = this.agents.filter(o => o.state==='I' && this.dist(a, o) < 40).length;
+            if (infNear >= this.params.mask_thresh) { a.masked = true; speedMult = 0.2; } else { a.masked = false; }
+          }
+          
+          a.x += a.vx * speedMult; a.y += a.vy * speedMult;
+          if (a.x <= 0 || a.x >= this.width) { a.vx *= -1; a.x = a.x <= 0 ? 0 : this.width; }
+          if (a.y <= 0 || a.y >= this.height) { a.vy *= -1; a.y = a.y <= 0 ? 0 : this.height; }
+        }
+
+        // === 2. 状态转移逻辑阶段 ===
+        if (this.category === 'epidemic') {
+          ['S','E','I','R','D','Q','A','V','M','W','H','T'].forEach(k => stats[k] = 0);
+          
+          for (let i = 0; i < this.numAgents; i++) {
+            let a = this.agents[i]; let na = nextAgents[i];
+
+            // 2.1 主动接触传染判定 (发散型)
+            if (['I', 'A', 'T'].includes(a.state)) {
+              let bRate = this.params.beta;
+              if(a.state === 'A') bRate = this.params.beta_A;
+              if(a.state === 'T') bRate = this.params.beta * 0.1; // 治疗中传染性大减
+              
+              for (let j = 0; j < this.numAgents; j++) {
+                 if (i !== j && this.dist(a, this.agents[j]) < 15) {
+                    let target = nextAgents[j];
+                    let canInfect = false;
+                    
+                    if (target.state === 'S') {
+                      let effectiveBeta = bRate;
+                      if (this.modelId === 'sia' && target.state === 'W') effectiveBeta *= 0.1;
+                      if (this.modelId === 'sir_mask' && target.masked) effectiveBeta *= 0.1;
+                      if (Math.random() < effectiveBeta) canInfect = true;
+                    } 
+                    else if (target.state === 'R' && this.modelId === 'siri') {
+                      if (Math.random() < this.params.beta * this.params.re_beta) canInfect = true;
+                    }
+
+                    if (canInfect) {
+                      if (['seir','seirs','seird','seiqh','seirq','sei'].includes(this.modelId)) target.state = 'E';
+                      else if (this.modelId === 'sair') target.state = Math.random() < this.params.p ? 'A' : 'I';
+                      else target.state = 'I';
+                    }
+                 }
+              }
+            }
+
+            // 2.2 自身状态衰变转移 (收敛型)
+            if (a.state === 'S') {
+               if (this.modelId === 'sivr' && Math.random() < this.params.v_rate) na.state = 'V';
+               else if (this.modelId === 'sia' && Math.random() < this.params.w_rate) na.state = 'W';
+            }
+            else if (a.state === 'M') {
+               if (Math.random() < this.params.m_decay) na.state = 'S';
+            }
+            else if (a.state === 'W') {
+               if (Math.random() < 0.05) na.state = 'S'; // 警觉衰退
+            }
+            else if (a.state === 'E') {
+               if (this.modelId === 'seirq' && Math.random() < this.params.q_rate_E) na.state = 'Q';
+               else if (Math.random() < this.params.sigma) na.state = 'I';
+            }
+            else if (a.state === 'I') {
+               if (this.modelId === 'sis' || this.modelId === 'siri') { if (Math.random() < this.params.gamma) na.state = this.modelId==='sis'?'S':'R'; }
+               else if (this.modelId === 'sid') { if (Math.random() < this.params.mu_d) na.state = 'D'; }
+               else if (this.modelId === 'seird') { if (Math.random() < this.params.gamma) na.state = 'R'; else if (Math.random() < this.params.mu_d) na.state = 'D'; }
+               else if (this.modelId === 'siqr') { if (Math.random() < this.params.delta) na.state = 'Q'; else if(Math.random()<this.params.gamma) na.state='R';}
+               else if (this.modelId === 'sihr') { if (Math.random() < this.params.h_rate) na.state = 'H'; else if(Math.random()<this.params.gamma) na.state='R';}
+               else if (this.modelId === 'seiqh') { if (Math.random() < this.params.q_rate) na.state = 'Q'; else if(Math.random()<this.params.gamma) na.state='R';}
+               else if (this.modelId === 'sirt') { if (Math.random() < this.params.t_rate) na.state = 'T'; else if(Math.random()<this.params.gamma) na.state='R';}
+               else if (this.modelId !== 'sei' && this.modelId !== 'si') { if (Math.random() < this.params.gamma) na.state = 'R'; } // 通用恢复
+            }
+            else if (a.state === 'A' || a.state === 'Q') { if (Math.random() < this.params.gamma) na.state = 'R'; }
+            else if (a.state === 'T') { if (Math.random() < this.params.t_gamma) na.state = 'R'; }
+            else if (a.state === 'H') { 
+               if (this.modelId === 'seiqh' && Math.random() < 0.01) na.state = 'D'; // 重症死亡
+               else if (Math.random() < this.params.gamma) na.state = 'R'; 
+            }
+            else if (a.state === 'R') {
+               if (['sirs', 'seirs'].includes(this.modelId) && Math.random() < this.params.alpha) na.state = 'S';
+            }
+
+            stats[na.state] = (stats[na.state] || 0) + 1;
+          }
+        } 
+        
+        else if (this.category === 'opinion') {
+          stats.Op0 = 0; stats.Op1 = 0; stats.meanOpinion = 0;
+
+          const getNeighbors = (idx, r) => {
+             let n = []; for(let j=0; j<this.numAgents; j++) if(idx!==j && this.dist(this.agents[idx], this.agents[j]) < r) n.push(this.agents[j]);
+             return n;
+          };
+
+          for (let i = 0; i < this.numAgents; i++) {
+            let a = this.agents[i]; let na = nextAgents[i];
+            
+            // 离散型模型通用统计
+            let isDiscrete = ['voter','majority','sznajd','ising','zealot','noisy_voter','inertia_majority','contrarian','coda','bass'].includes(this.modelId);
+
+            if (this.modelId === 'hk') {
+              let n = getNeighbors(i, 30);
+              let valid = n.map(o=>o.opinion).filter(op => Math.abs(a.opinion - op) <= this.params.epsilon);
+              if (valid.length > 0) na.opinion += this.params.mu_op * (valid.reduce((s,v)=>s+v,0)/valid.length - a.opinion);
+            }
+            else if (this.modelId === 'dw' || this.modelId === 'stubborn_dw') {
+              if (a.isStubborn !== undefined) { na.opinion = a.isStubborn; } else {
+                 let n = getNeighbors(i, 30);
+                 if(n.length > 0) {
+                    let target = n[Math.floor(Math.random()*n.length)];
+                    if(Math.abs(a.opinion - target.opinion) < this.params.epsilon) na.opinion += this.params.mu_op * (target.opinion - a.opinion);
+                 }
+              }
+            }
+            else if (this.modelId === 'fj') {
+              let n = getNeighbors(i, 30);
+              if(n.length > 0) {
+                 let mean = n.reduce((s,v)=>s+v.opinion,0)/n.length;
+                 na.opinion = this.params.alpha * mean + (1 - this.params.alpha) * a.initialOp;
+              }
+            }
+            else if (this.modelId === 'repulsive_hk') {
+              let n = getNeighbors(i, 30);
+              let delta = 0;
+              n.forEach(target => {
+                 let diff = target.opinion - a.opinion;
+                 if(Math.abs(diff) <= this.params.epsilon) delta += diff * this.params.mu_op; // 吸收
+                 else if(Math.abs(diff) >= this.params.rep_thresh) delta -= diff * this.params.mu_op * 0.5; // 排斥
+              });
+              na.opinion = Math.max(0, Math.min(1, a.opinion + delta));
+            }
+            else if (this.modelId === 'echo') {
+               let n = getNeighbors(i, 30);
+               if(n.length > 0) {
+                  let sumW = 0, sumOp = 0;
+                  n.forEach(t => {
+                     let weight = Math.pow(1 - Math.abs(a.opinion - t.opinion), this.params.bias);
+                     sumW += weight; sumOp += t.opinion * weight;
+                  });
+                  if(sumW > 0) na.opinion += 0.5 * (sumOp/sumW - a.opinion);
+               }
+            }
+            else if (this.modelId === 'altafini') {
+               let n = getNeighbors(i, 30);
+               let delta = 0;
+               n.forEach(t => {
+                  let diff = t.opinion - a.opinion;
+                  if(t.id === a.enemyId) delta -= Math.sign(diff) * this.params.mu_op * 0.1; // 宿敌排斥
+                  else if(Math.abs(diff) < this.params.epsilon) delta += diff * this.params.mu_op;
+               });
+               na.opinion = Math.max(0, Math.min(1, a.opinion + delta));
+            }
+            else if (this.modelId === 'truth') {
+               let n = getNeighbors(i, 30);
+               let delta = 0;
+               if(n.length > 0) {
+                  let valid = n.filter(t => Math.abs(a.opinion - t.opinion) < this.params.epsilon);
+                  if(valid.length>0) delta += this.params.mu_op * (valid.reduce((s,v)=>s+v.opinion,0)/valid.length - a.opinion);
+               }
+               delta += this.params.truth_pull * (0.8 - a.opinion); // 真理(0.8)牵引
+               na.opinion = Math.max(0, Math.min(1, a.opinion + delta));
+            }
+            
+            // 离散逻辑组
+            else if (this.modelId === 'voter' || this.modelId === 'noisy_voter' || this.modelId === 'zealot') {
+              if (na.isZealot) { na.opinion = 1; }
+              else {
+                let noise = this.modelId === 'noisy_voter' ? this.params.noise : 0;
+                if (Math.random() < noise) { na.opinion = a.opinion === 0 ? 1 : 0; }
+                else {
+                  let n = getNeighbors(i, 20);
+                  if (n.length > 0) na.opinion = n[Math.floor(Math.random()*n.length)].opinion;
+                }
+              }
+            }
+            else if (this.modelId === 'majority' || this.modelId === 'inertia_majority' || this.modelId === 'contrarian') {
+              let n = getNeighbors(i, this.params.radius);
+              if(n.length > 0) {
+                 let count1 = n.filter(o => o.opinion === 1).length;
+                 let ratio = count1 / n.length;
+                 
+                 if (this.modelId === 'contrarian' && a.isContra) {
+                    na.opinion = ratio > 0.5 ? 0 : 1;
+                 } else if (this.modelId === 'inertia_majority') {
+                    if (ratio >= this.params.threshold) na.opinion = 1;
+                    else if (1 - ratio >= this.params.threshold) na.opinion = 0;
+                 } else {
+                    if(count1 > n.length/2) na.opinion = 1; else if(count1 < n.length/2) na.opinion = 0;
+                 }
+              }
+            }
+            else if (this.modelId === 'sznajd') {
+              let n = getNeighbors(i, this.params.radius);
+              if(n.length > 0) {
+                 let partner = n[Math.floor(Math.random()*n.length)];
+                 if(a.opinion === partner.opinion) {
+                    getNeighbors(i, this.params.radius * 1.5).forEach(t => nextAgents[t.id].opinion = a.opinion);
+                 }
+              }
+            }
+            else if (this.modelId === 'ising') {
+              let n = getNeighbors(i, 25);
+              let sumSpin = n.reduce((sum, v) => sum + v.opinion, 0);
+              let dE = 2 * a.opinion * sumSpin;
+              if(Math.random() < 1/(1+Math.exp(dE/this.params.temperature))) na.opinion *= -1;
+            }
+            else if (this.modelId === 'coda') {
+               let n = getNeighbors(i, this.params.radius);
+               if(n.length > 0) {
+                  let obs = n[Math.floor(Math.random()*n.length)].opinion;
+                  if(obs === 1) na.hidden_p = Math.min(1, a.hidden_p + this.params.alpha);
+                  else na.hidden_p = Math.max(0, a.hidden_p - this.params.alpha);
+                  na.opinion = na.hidden_p > 0.5 ? 1 : 0;
+               }
+            }
+            else if (this.modelId === 'bass') {
+               if(a.opinion === 0) {
+                  let n = getNeighbors(i, this.params.radius);
+                  let infRatio = n.length>0 ? n.filter(o=>o.opinion===1).length/n.length : 0;
+                  let prob = this.params.p_innov + this.params.q_imit * infRatio;
+                  if(Math.random() < prob) na.opinion = 1;
+               }
+            }
+            
+            // 特殊结构逻辑组
+            else if (this.modelId === 'naming') {
+              let n = getNeighbors(i, 30);
+              if(n.length > 0) {
+                let listener = n[Math.floor(Math.random()*n.length)];
+                let word = a.vocab[Math.floor(Math.random()*a.vocab.length)];
+                if(listener.vocab.includes(word)) {
+                   na.vocab = [word]; nextAgents[listener.id].vocab = [word];
+                } else if(!nextAgents[listener.id].vocab.includes(word)) {
+                   nextAgents[listener.id].vocab.push(word);
+                }
+              }
+            }
+            else if (this.modelId === 'axelrod') {
+              let n = getNeighbors(i, 25);
+              if(n.length > 0) {
+                 let partner = n[Math.floor(Math.random()*n.length)];
+                 let overlap = a.traits.reduce((acc, val, idx) => acc + (val===partner.traits[idx]?1:0), 0);
+                 if(overlap > 0 && overlap < 3 && Math.random() < overlap/3) {
+                    let diffs = [0,1,2].filter(idx => a.traits[idx] !== partner.traits[idx]);
+                    na.traits[diffs[Math.floor(Math.random()*diffs.length)]] = partner.traits[diffs[Math.floor(Math.random()*diffs.length)]];
+                 }
+              }
+            }
+
+            // 统计聚合
+            if (!isDiscrete && a.opinion !== undefined) stats.meanOpinion += na.opinion;
+            if (isDiscrete) { if(na.opinion <= 0) stats.Op0++; else stats.Op1++; }
+          }
+          if(!['voter','majority','sznajd','ising','zealot','noisy_voter','inertia_majority','contrarian','coda','bass','naming','axelrod'].includes(this.modelId)) stats.meanOpinion /= this.numAgents;
+        }
+
+        this.agents = nextAgents;
+        if (this.tickCount % 5 === 0) {
+           stats.tick = this.tickCount; this.history.push(stats);
+           if (this.history.length > 100) this.history.shift();
+        }
+        return { agents: this.agents, stats, history: this.history };
+      }
+    }
+
+    // ==========================================
+    // 3. UI 子组件
+    // ==========================================
+    const SimpleLineChart = ({ data, lines }) => {
+      if (!data || data.length === 0) return null;
+      const width = 300, height = 120, padding = 10;
+      let maxVal = 1;
+      data.forEach(d => lines.forEach(l => { if ((d[l.key]||0) > maxVal) maxVal = d[l.key]; }));
+      if(maxVal < 10) maxVal = 10;
+      const getX = i => padding + (i / (data.length - 1 || 1)) * (width - padding * 2);
+      const getY = v => height - padding - ((v||0) / maxVal) * (height - padding * 2);
+
+      return (
+        <div className="bg-slate-800 rounded-xl p-4 border border-slate-700 w-full mt-4 shadow-inner">
+          <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">宏观稳态监控台</h3>
+          <svg width="100%" viewBox={`0 0 ${width} ${height}`} className="overflow-visible">
+            <line x1={padding} y1={height-padding} x2={width-padding} y2={height-padding} stroke="#475569" strokeWidth="1" />
+            <line x1={padding} y1={padding} x2={padding} y2={height-padding} stroke="#475569" strokeWidth="1" />
+            {lines.map(line => (
+              <path key={line.key} d={data.map((d, i) => `${i===0?'M':'L'} ${getX(i)} ${getY(d[line.key])}`).join(' ')} fill="none" stroke={line.color} strokeWidth="2" strokeLinejoin="round" />
+            ))}
+          </svg>
+          <div className="flex flex-wrap gap-2 mt-3">
+            {lines.map(line => {
+              const val = data[data.length-1]?.[line.key];
+              if(val === undefined || val === 0) return null;
+              return (
+                <div key={line.key} className="flex items-center text-[10px] text-slate-300">
+                  <span className="w-2 h-2 rounded-full mr-1" style={{ backgroundColor: line.color }}></span>
+                  {line.name} ({val.toFixed(0)})
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    };
+
+    // ==========================================
+    // 4. 主控与渲染系统
+    // ==========================================
+    function App() {
+      const [activeCat, setActiveCat] = useState('epidemic');
+      const [activeId, setActiveId] = useState('sir');
+      const [isRunning, setIsRunning] = useState(false);
+      const [showInfo, setShowInfo] = useState(false);
+      const [params, setParams] = useState({});
+      const [stats, setStats] = useState(null);
+      const [history, setHistory] = useState([]);
+      
+      const canvasRef = useRef(null);
+      const engineRef = useRef(null);
+      const requestRef = useRef();
+
+      const model = MODELS[activeCat].find(m => m.id === activeId);
+
+      useEffect(() => {
+        if (model) {
+          const initP = {}; model.params.forEach(p => initP[p.id] = p.default);
+          setParams(initP); resetSim(initP);
+        }
+      }, [activeId]);
+
+      const resetSim = (p = params) => {
+        setIsRunning(false); if(requestRef.current) cancelAnimationFrame(requestRef.current);
+        engineRef.current = new SimulatorEngine(activeCat, activeId, p, 600, 450);
+        setHistory([]); draw(engineRef.current.agents);
+      };
+
+      const handlePChange = (id, val) => {
+        const nP = { ...params, [id]: parseFloat(val) }; setParams(nP);
+        if (engineRef.current) engineRef.current.params = nP;
+      };
+
+      const draw = (agents) => {
+        const ctx = canvasRef.current?.getContext('2d'); if (!ctx) return;
+        ctx.fillStyle = '#0f172a'; ctx.fillRect(0, 0, 600, 450);
+        
+        // 渲染真理标记(如果存在)
+        if(activeId === 'truth') { ctx.fillStyle='rgba(74, 222, 128, 0.1)'; ctx.fillRect(0, 0, 600, 450); }
+
+        for (let i = 0; i < agents.length; i++) {
+          let a = agents[i]; ctx.beginPath(); ctx.arc(a.x, a.y, 3.5, 0, 2*Math.PI);
+          
+          if (activeCat === 'epidemic') {
+            ctx.fillStyle = COLORS[a.state] || '#fff';
+            if(a.masked) { ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; ctx.stroke(); }
+            if (a.state === 'D') { ctx.arc(a.x, a.y, 4.5, 0, 2*Math.PI); }
+            if (a.state === 'H') { ctx.arc(a.x, a.y, 5, 0, 2*Math.PI); ctx.fillRect(a.x-3, a.y-1, 6, 2); ctx.fillRect(a.x-1, a.y-3, 2, 6); } // 十字架
+          } 
+          else {
+            if (['voter','majority','sznajd','ising','zealot','noisy_voter','inertia_majority','contrarian','coda','bass'].includes(activeId)) {
+               if(a.isZealot) { ctx.fillStyle = COLORS.Zealot; ctx.arc(a.x, a.y, 5, 0, 2*Math.PI); }
+               else if(a.isContra) { ctx.fillStyle = COLORS.Contra; ctx.arc(a.x, a.y, 4, 0, 2*Math.PI); }
+               else ctx.fillStyle = a.opinion <= 0 ? COLORS.Op0 : COLORS.Op1;
+            }
+            else if (['hk','dw','fj','altafini','repulsive_hk','stubborn_dw','echo','truth'].includes(activeId)) {
+               let op = Math.max(0, Math.min(1, a.opinion));
+               ctx.fillStyle = `rgb(${Math.floor(op*255)}, 50, ${255 - Math.floor(op*255)})`;
+               if(a.isStubborn !== undefined) { ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.stroke(); }
+            }
+            else if (activeId === 'naming') {
+               if(a.vocab.length>1) ctx.fillStyle = COLORS.Gray;
+               else ctx.fillStyle = `hsl(${(a.vocab[0]*60)%360}, 80%, 50%)`;
+            }
+            else if (activeId === 'axelrod') {
+               ctx.fillStyle = `rgb(${a.traits[0]?255:50},${a.traits[1]?255:50},${a.traits[2]?255:50})`;
+            }
+          }
+          ctx.fill();
+        }
+      };
+
+      const animate = useCallback(() => {
+        if (!engineRef.current || !isRunning) return;
+        const res = engineRef.current.step(); draw(res.agents);
+        if (engineRef.current.tickCount % 5 === 0) { setStats(res.stats); setHistory([...res.history]); }
+        requestRef.current = requestAnimationFrame(animate);
+      }, [isRunning]);
+
+      useEffect(() => { if (isRunning) requestRef.current = requestAnimationFrame(animate); return () => cancelAnimationFrame(requestRef.current); }, [isRunning, animate]);
+
+      const getLines = () => {
+        if (activeCat === 'epidemic') {
+          const keys = ['S','E','I','A','T','Q','H','R','V','M','W','D'];
+          const names = {'S':'易感','E':'潜伏','I':'感染','A':'无症','T':'治疗','Q':'隔离','H':'住院','R':'恢复','V':'免疫','M':'母抗','W':'警觉','D':'死亡'};
+          return keys.filter(k => stats && stats[k] > 0).map(k => ({ key: k, name: names[k], color: COLORS[k] }));
+        }
+        if (['voter','majority','sznajd','ising','zealot','noisy_voter','inertia_majority','contrarian','coda','bass'].includes(activeId)) {
+          return [{ key: 'Op0', name: '观点 0', color: COLORS.Op0 }, { key: 'Op1', name: '观点 1', color: COLORS.Op1 }];
+        }
+        return [];
+      };
+
+      if (!model) return null;
+
+      return (
+        <div className="flex h-screen w-full font-sans text-slate-200">
+          {/* 左侧导航树 (极简深色) */}
+          <div className="w-72 bg-slate-900 border-r border-slate-800 flex flex-col shrink-0 shadow-2xl z-20">
+            <div className="p-5 border-b border-slate-800 flex items-center gap-3 bg-slate-950">
+              <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center shadow-lg"><Activity size={18} className="text-white" /></div>
+              <h1 className="font-bold text-[17px] tracking-tight">网络动力学</h1>
+            </div>
+            <div className="flex-1 overflow-y-auto py-2 custom-scrollbar">
+              {CATEGORIES.map(cat => (
+                <div key={cat.id} className="mb-6">
+                  <div className="px-5 py-2 mt-2 text-[11px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2 sticky top-0 bg-slate-900 z-10"><cat.icon size={13} /> {cat.name}</div>
+                  <ul className="space-y-0.5 px-2">
+                    {MODELS[cat.id].map(m => (
+                      <li key={m.id}>
+                        <button onClick={() => { setActiveCat(cat.id); setActiveId(m.id); }} className={`w-full text-left px-3 py-1.5 rounded-md text-[13px] transition-all flex items-center justify-between ${activeId === m.id ? 'bg-indigo-500/20 text-indigo-300 font-semibold border border-indigo-500/30' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}>
+                          <span className="truncate">{m.name}</span>{activeId === m.id && <ChevronRight size={14} />}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* 右侧主控区 */}
+          <div className="flex-1 flex flex-col min-w-0 bg-slate-950 relative">
+            <header className="h-[72px] border-b border-slate-800 bg-slate-900/60 backdrop-blur-md flex items-center justify-between px-6 shrink-0 z-10">
+              <div className="pr-4 overflow-hidden">
+                <h2 className="text-lg font-bold text-slate-100 truncate">{model.name}</h2>
+                <p className="text-[13px] text-slate-400 truncate mt-0.5">{model.desc}</p>
+              </div>
+              <div className="flex items-center gap-3 shrink-0">
+                <button onClick={() => setShowInfo(true)} className="p-2 rounded-full hover:bg-slate-800 text-slate-400 hover:text-indigo-400 transition" title="原理解释"><Info size={20} /></button>
+                <div className="h-6 w-px bg-slate-700 mx-1"></div>
+                <button onClick={() => resetSim()} className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm border border-slate-700 transition"><RotateCcw size={15} /> 重置</button>
+                <button onClick={() => setIsRunning(!isRunning)} className={`flex items-center gap-1.5 px-6 py-2 rounded-lg transition-all text-sm font-bold shadow-lg ${isRunning ? 'bg-rose-500/20 text-rose-400 border border-rose-500/50 hover:bg-rose-500/30' : 'bg-indigo-600 text-white hover:bg-indigo-500 shadow-indigo-500/20'}`}>
+                  {isRunning ? <><Pause size={15} /> 暂停</> : <><Play size={15} /> 演化</>}
+                </button>
+              </div>
+            </header>
+
+            <div className="flex-1 flex overflow-hidden p-6 gap-6">
+              {/* 画布 */}
+              <div className="flex-1 flex flex-col bg-slate-900 rounded-2xl border border-slate-800 shadow-2xl overflow-hidden relative">
+                 <div className="absolute top-4 left-4 bg-slate-950/80 backdrop-blur-sm px-3 py-1.5 rounded text-[11px] font-mono text-slate-400 border border-slate-800 z-10 flex gap-4">
+                    <span>Ticks: {stats?.tick || 0}</span><span>Agents: 600</span>
+                 </div>
+                 <div className="flex-1 flex items-center justify-center bg-black/50">
+                    <canvas ref={canvasRef} width={600} height={450} className="w-full h-full object-contain" style={{ imageRendering: 'pixelated' }} />
+                 </div>
+              </div>
+
+              {/* 侧边栏仪表面板 */}
+              <div className="w-80 flex flex-col gap-5 overflow-y-auto pr-2 custom-scrollbar shrink-0">
+                <div className="bg-slate-900 rounded-2xl border border-slate-800 p-5 shadow-lg">
+                  <div className="flex items-center gap-2 mb-4 text-slate-100 font-semibold"><Activity size={16} className="text-indigo-400"/> 数据中心</div>
+                  {stats && stats.meanOpinion !== undefined && (
+                    <div className="mb-4 bg-slate-950/50 p-3 rounded-lg border border-slate-800">
+                       <div className="text-[11px] text-slate-500 mb-1">全局观点均值 (0.0~1.0)</div>
+                       <div className="text-2xl font-mono text-indigo-400">{stats.meanOpinion.toFixed(3)}</div>
+                       <div className="w-full h-1.5 bg-slate-800 rounded-full mt-2 overflow-hidden"><div className="h-full bg-gradient-to-r from-blue-500 to-red-500 transition-all" style={{ width: `${stats.meanOpinion * 100}%` }}></div></div>
+                    </div>
+                  )}
+                  {getLines().length > 0 ? <SimpleLineChart data={history} lines={getLines()} /> : <div className="text-xs text-slate-500 p-4 text-center bg-slate-800/30 rounded-lg border border-slate-800/50">多维度特征展示中</div>}
+                </div>
+
+                <div className="bg-slate-900 rounded-2xl border border-slate-800 p-5 shadow-lg">
+                  <div className="flex items-center gap-2 mb-5 text-slate-100 font-semibold"><Settings size={16} className="text-slate-400"/> 动力学参数</div>
+                  <div className="space-y-6">
+                    {model.params.length === 0 ? <div className="text-xs text-slate-500 italic">该模型为零参数纯粹自组织系统。</div> : 
+                     model.params.map(p => (
+                      <div key={p.id} className="space-y-2">
+                        <div className="flex justify-between text-xs">
+                          <label className="text-slate-300 font-medium">{p.name}</label>
+                          <span className="font-mono text-indigo-300 bg-indigo-500/20 px-1.5 py-0.5 rounded">{params[p.id]}</span>
+                        </div>
+                        <input type="range" min={p.min} max={p.max} step={p.step} value={params[p.id] || p.default} onChange={e => handlePChange(p.id, e.target.value)} className="w-full h-1 bg-slate-700 rounded-full appearance-none cursor-pointer accent-indigo-500" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 科学解释模态框 */}
+          {showInfo && (
+            <div className="absolute inset-0 z-50 flex items-center justify-center p-6 bg-slate-950/80 backdrop-blur-sm transition-all">
+              <div className="bg-slate-900 border border-slate-700 shadow-2xl rounded-xl w-full max-w-2xl flex flex-col overflow-hidden transform scale-100">
+                <div className="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-800/50">
+                  <h2 className="text-lg font-bold flex items-center gap-2 text-slate-100"><Info className="text-indigo-400" /> {model.name}</h2>
+                  <button onClick={() => setShowInfo(false)} className="p-1.5 rounded-md hover:bg-slate-700 text-slate-400 transition"><X size={20} /></button>
+                </div>
+                <div className="p-8 overflow-y-auto max-h-[65vh] prose prose-invert max-w-none text-slate-300 custom-scrollbar" dangerouslySetInnerHTML={{ __html: model.explanation }} />
+                <div className="px-6 py-4 border-t border-slate-800 bg-slate-900 flex justify-end">
+                  <button onClick={() => setShowInfo(false)} className="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-medium text-sm transition shadow-lg shadow-indigo-500/20">关闭面板</button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
